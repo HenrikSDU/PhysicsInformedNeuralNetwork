@@ -3,15 +3,31 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as transforms
+from torchinfo import summary
 import matplotlib.pyplot as plt
 import json
-from pathlib import Path
+import time
 
 from tqdm import tqdm
 
 # Import reduced plank constant
 #from scipy.constants import hbar
 hbar = 1
+
+import random
+# Set seeds for reproducibility
+SEED = 21
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+torch.cuda.manual_seed(SEED)
+torch.cuda.manual_seed_all(SEED)  # if using multi-GPU
+
+# Ensure deterministic behavior
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+
+
 
 # Analytical Solution
 def psi_analytical_n(x,n=0,m=1.0,w=1):
@@ -76,13 +92,29 @@ def loss(x, model, n=0, lambda_p=0.0001, lambda_b=0.0001, N_p=500,w=1,m=1):
 
 def train_PINN(model, optimizer, n=0, boundary=(-5,5), lambda_p=0.0001, lambda_b=0.0001, N_p=500, N_val=500, num_epochs = 1000,m=1,w=1, log_every=100):
 
-    out_dict = {'train_loss': [],
-                'val_loss': [],
-                'x': []}
+    model_dict = {
+        'architecture': str(summary(model, input_size=(1,1))),
+        'lr': 0.001,
+        'n': n,
+        'boundary': boundary,
+        'lambda_p': lambda_p,
+        'lambda_b': lambda_b,
+        'N_p': N_p,
+        'N_val': N_val,
+        'num_epochs': num_epochs,
+        'm': m,
+        'w': w,
+        'log_every': log_every,
+        'loss_dict': {
+            'train_loss': [],
+            'val_loss': [],
+            'x': []
+        }
+    }
 
     x_tr = np.linspace(boundary[0], boundary[1], N_p, endpoint=True).reshape(-1, 1)
     x_val = np.linspace(boundary[0], boundary[1], N_val, endpoint=True).reshape(-1, 1)
-    out_dict['x'] = x_val
+    model_dict['loss_dict']['x'] = x_val.tolist()
     x_tr = torch.from_numpy(x_tr).float().to(device).requires_grad_(True)
     x_val = torch.from_numpy(x_val).float().to(device).requires_grad_(True)
     
@@ -102,7 +134,7 @@ def train_PINN(model, optimizer, n=0, boundary=(-5,5), lambda_p=0.0001, lambda_b
         if e%log_every == 0 or e == num_epochs-1:
             print(f"Training loss at epoch {e}:",end=" ") 
             print(tr_loss.item())
-        out_dict['train_loss'].append(tr_loss.item())  
+        model_dict['loss_dict']['train_loss'].append(tr_loss.item())  
         
         model.eval()
         with torch.no_grad():
@@ -126,30 +158,16 @@ def train_PINN(model, optimizer, n=0, boundary=(-5,5), lambda_p=0.0001, lambda_b
                 plt.figure()
                 plt.plot(x,psi_analytical,'r',label="Analytical Solution")
                 plt.plot(x,psi, 'b', label="Prediction")
+                plt.grid()
                 plt.xlabel('Position (X)')
-                plt.ylabel('Probability (P)')
+                plt.ylabel(r'$\Psi$')
                 plt.legend()
                 plt.title('Predictions Vs Analytical')
                 plt.savefig(f"PredictionsVsAnalyticalAtEpoch{e}")
-            out_dict['val_loss'].append(analytical_loss.mean())
-    return out_dict
+            model_dict['loss_dict']['val_loss'].append(float(analytical_loss.mean()))
+        
 
-
-def export_settings(settings: dict, filename: str | Path) -> None:
-    """Save a dictionary of settings to a JSON file."""
-    path = Path(filename)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(settings, f, indent=4)
-    print(f"Settings saved to {path.resolve()}")
-
-
-def load_settings(filename: str | Path) -> dict:
-    """Load settings from a JSON file."""
-    path = Path(filename)
-    with path.open("r", encoding="utf-8") as f:
-        settings = json.load(f)
-    print(f"Settings loaded from {path.resolve()}")
-    return settings
+    return model_dict
 
    
 if __name__ == "__main__":
@@ -165,6 +183,7 @@ if __name__ == "__main__":
     # Send Model to GPU
     pinn.to(device)
 
+
     # Initialize optimizer
     optimizer = torch.optim.Adam(pinn.parameters(),lr=0.0001)
     
@@ -175,24 +194,30 @@ if __name__ == "__main__":
     # epochs = 6000, N_p = 10
     
     epochs = range(epochs)
-    train_loss = out['train_loss']
-    val_loss = out['val_loss']
+    train_loss = out['loss_dict']['train_loss']
+    val_loss = out['loss_dict']['val_loss']
     plt.figure()
     plt.plot(epochs,train_loss,'b',label="Train Loss")
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
+    plt.grid()
     plt.legend()
     plt.savefig(f"TrainLoss")
-
 
 
     plt.figure()
     plt.plot(epochs,val_loss, 'g', label="Validation Loss")
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
+    plt.grid()
     plt.legend()
     plt.savefig(f"ValidationLoss")
 
+    print(out['architecture'])
+
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    with open(f'settings_{timestamp}.json', 'w') as f:
+        json.dump(out, f)
 
     """
     pinn.eval()
