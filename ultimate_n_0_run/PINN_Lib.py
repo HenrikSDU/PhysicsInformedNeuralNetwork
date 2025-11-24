@@ -126,7 +126,7 @@ def loss(x, model, n=0, lambda_p=0.0001, lambda_p_end=0.0001, lambda_b=0.0001, l
     lambda_b_inter = ((lambda_b_end - lambda_b) / epochs) * epoch_n + lambda_b
 
     
-    l_integral = (lambda_i_inter * (1 - psi_integral)**2) / integral_resolution
+    l_integral = lambda_i_inter * (1 - psi_integral)**2
 
     l_boundary = lambda_b_inter/2 * (psi[0]**2 + psi[-1]**2)
     l_physics = ((-hbar/(2*m) * ddpsi + 0.5*m*w**2 * x**2 * psi - E_n * psi)**2).sum()
@@ -272,8 +272,8 @@ if __name__ == "__main__":
                      lambda_p_end=100.0, 
                      lambda_b=5.0,
                      lambda_b_end=5.0,
-                     lambda_i=5000.0,
-                     lambda_i_end=2500.0,
+                     lambda_i=5.0,
+                     lambda_i_end=2.5,
                      adaptive_learning_rate=1,
                      integral_resolution=1000,
                      N_p=100, 
