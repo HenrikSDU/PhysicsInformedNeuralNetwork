@@ -25,7 +25,7 @@ w = 1
 
 import random
 # Set seeds for reproducibility
-SEED = 20
+SEED = 21
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
@@ -267,8 +267,8 @@ if __name__ == "__main__":
     # Initialize optimizer
     optimizer = torch.optim.Adam(pinn.parameters(), lr=0.0001, weight_decay=0.0001)
     
-    epochs_num = 1500
-    log_every_d = 3
+    epochs_num = 9000
+    log_every_d = 9
     out = train_PINN(pinn, optimizer,
                      lambda_p=50.0, 
                      lambda_p_end=100.0, 
@@ -281,7 +281,7 @@ if __name__ == "__main__":
                      N_p=100, 
                      N_val=500, 
                      num_epochs=epochs_num, 
-                     log_every=epochs_num/log_every_d,n=0)
+                     log_every=epochs_num/log_every_d,n=2)
 
     # Good combos
     # epochs = 6000, N_p = 10
