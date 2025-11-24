@@ -8,7 +8,7 @@ from torchinfo import summary
 import matplotlib.pyplot as plt
 import json
 import time
-from sklearn.metrics import root_mean_squared_error
+
 
 from tqdm import tqdm
 
@@ -25,7 +25,7 @@ w = 1
 
 import random
 # Set seeds for reproducibility
-SEED = 20
+SEED = 21
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
@@ -40,7 +40,7 @@ torch.backends.cudnn.benchmark = False
 # Analytical Solution
 def psi_analytical_n(x,n=0,m=1.0,w=1):
     y = np.sqrt(m*w/hbar)*x
-    normalization_constant = np.power((m * w) / (np.pi * hbar), 1/4) * (1 / np.sqrt(np.pow(2, n) * math.factorial(n)))
+    normalization_constant = np.power((m * w) / (np.pi * hbar), 1/4) * (1 / np.sqrt(np.power(2, n) * math.factorial(n)))
 
     if n == 0:
         return normalization_constant * np.exp(-0.5*y**2)
@@ -100,7 +100,7 @@ def loss(x, model, n=0, lambda_p=0.0001, lambda_p_end=0.0001, lambda_b=0.0001, l
     x_int = np.linspace(x_int_start, x_int_end, integral_resolution, endpoint=True).reshape(-1, 1)
     x_int = torch.from_numpy(x_int).float().to(device)
 
-    # i ran
+    # Compute numerical integral
     psi_x_int = (model(x_int))**2 # Get probability 
     #stepsize = (abs(x_int_end) + abs(x_int_start)) / integral_resolution
     #psi_integral = stepsize * psi_x_int.sum()
@@ -126,7 +126,7 @@ def loss(x, model, n=0, lambda_p=0.0001, lambda_p_end=0.0001, lambda_b=0.0001, l
     lambda_b_inter = ((lambda_b_end - lambda_b) / epochs) * epoch_n + lambda_b
 
     
-    l_integral = (lambda_i_inter * (1 - psi_integral)**2) / integral_resolution
+    l_integral = (lambda_i_inter * (1 - psi_integral)**2) 
 
     l_boundary = lambda_b_inter/2 * (psi[0]**2 + psi[-1]**2)
     l_physics = ((-hbar/(2*m) * ddpsi + 0.5*m*w**2 * x**2 * psi - E_n * psi)**2).sum()
@@ -233,6 +233,7 @@ def train_PINN(model, optimizer, n=0, boundary=(-5,5), lambda_p=0.0001, lambda_p
                 plt.xlabel('Position (X)')
                 plt.ylabel(r'$\Psi$')
                 plt.legend()
+                #plt.title(f'Predictions after Epoch: {e+1}')
                 plt.title(f'Predictions Vs Analytical at Epoch: {e}')
                 plt.savefig(f"test_run_images/PredictionsVsAnalyticalAtEpoch{e}")
                 print("Figure Saved!")
@@ -266,20 +267,21 @@ if __name__ == "__main__":
     # Initialize optimizer
     optimizer = torch.optim.Adam(pinn.parameters(), lr=0.0001, weight_decay=0.0001)
     
-    epochs = 9000
+    epochs_num = 8000
+    log_every_d = 16
     out = train_PINN(pinn, optimizer,
                      lambda_p=50.0, 
                      lambda_p_end=100.0, 
                      lambda_b=5.0,
                      lambda_b_end=5.0,
-                     lambda_i=5000.0,
-                     lambda_i_end=2500.0,
+                     lambda_i=5.0,
+                     lambda_i_end=2.5,
                      adaptive_learning_rate=1,
                      integral_resolution=1000,
                      N_p=100, 
                      N_val=500, 
-                     num_epochs=epochs, 
-                     log_every=epochs/18,n=0)
+                     num_epochs=epochs_num, 
+                     log_every=epochs_num/log_every_d,n=2)
 
     # Good combos
     # epochs = 6000, N_p = 10
@@ -293,7 +295,7 @@ if __name__ == "__main__":
     #################################################
     #                    Plotting                   #
     #################################################
-    epochs = range(epochs)
+    epochs = range(epochs_num)
     train_loss = out['loss_dict']['train_loss']
     integral_loss = out['loss_dict']['integral_loss']
     physics_loss = out['loss_dict']['physics_loss']
@@ -322,7 +324,6 @@ if __name__ == "__main__":
     plt.savefig(f"test_run_images/ValidationLoss")
 
 
-    # Example: assuming your losses are lists/arrays in out['loss_dict']
     epochs = range(len(out['loss_dict']['train_loss']))
     integral_loss = np.array(out['loss_dict']['integral_loss'])
     boundary_loss = np.array(out['loss_dict']['boundary_loss'])
